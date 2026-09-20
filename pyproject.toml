@@ -1,0 +1,20 @@
+[project]
+name = "cv-mba"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "danimoreira90", email = "101526289+danimoreira90@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "kaggle>=2.2.4",
+    "pandas>=3.0.6",
+]
