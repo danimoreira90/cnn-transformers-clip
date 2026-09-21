@@ -15,6 +15,7 @@ small to appear in both halves raises instead of quietly vanishing from evaluati
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Sequence
 
@@ -129,3 +130,102 @@ def stratified_split(
     train = pd.concat(train_parts).sort_index()
     test = pd.concat(test_parts).sort_index()
     return train, test
+
+
+A3_CLASSES = ("bike", "cars", "cats", "dogs", "flowers", "horses", "human")
+"""The seven class folders in the Kaggle images-dataset, in label order.
+
+Labels are the alphabetical index, matching what torchvision's ImageFolder would assign,
+so a model trained with either route reads the same.
+"""
+
+_IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".bmp"})
+"""Formats present in A3. They vary by class: bmp for bike and cars, png for flowers,
+jpg for the rest. Any loader that assumes one format silently loses whole classes."""
+
+
+class DuplicateCorpusWarning(UserWarning):
+    """Warns that a dataset directory holds a second copy of its own images.
+
+    The A3 archive ships `data/` and, inside it, `data/data/` — an exact duplicate. A
+    recursive load returns 3,606 images instead of 1,803, invents an eighth class named
+    `data`, and puts every picture in the set twice. Split that 80/20 and the same image
+    lands in training and validation, so validation accuracy measures memorisation.
+
+    `a3_index` cannot fall into this, because it reads the seven named class folders and
+    nothing else. The warning exists because `ImageFolder` and every other recursive
+    loader can, and someone reaching for one needs to know the trap is there.
+    """
+
+
+def _images_in(folder: Path) -> list[Path]:
+    """Image files directly inside `folder`. Never recurses, by design."""
+    return sorted(
+        path
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in _IMAGE_SUFFIXES
+    )
+
+
+def a3_index(root: Path | str) -> pd.DataFrame:
+    """Index the Kaggle images-dataset from the directory holding the class folders.
+
+    Returns one row per image with `path`, `class_name` and `label`.
+
+    Enumerates the seven named class folders, non-recursively, and nothing else. The
+    count is therefore unaffected by anything else sitting in `root` — including the
+    archive's copy of itself. Any such directory raises a DuplicateCorpusWarning naming
+    it, because a recursive loader pointed at the same place would silently double the
+    dataset.
+    """
+    root = Path(root)
+
+    if not root.is_dir():
+        raise DatasetNotFoundError(f"not a directory: {root}")
+
+    missing = [name for name in A3_CLASSES if not (root / name).is_dir()]
+    if missing:
+        one_level_down = root / "data"
+        if one_level_down.is_dir() and not [
+            name for name in A3_CLASSES if not (one_level_down / name).is_dir()
+        ]:
+            raise DatasetNotFoundError(
+                f"no class folders in {root}, but all seven are in {one_level_down}. "
+                f"Point a3_index at {one_level_down}"
+            )
+        raise DatasetNotFoundError(
+            f"missing class folder(s) under {root}: {', '.join(missing)}"
+        )
+
+    intruders = [
+        folder
+        for folder in sorted(root.iterdir())
+        if folder.is_dir()
+        and folder.name not in A3_CLASSES
+        and _has_images_anywhere(folder)
+    ]
+    if intruders:
+        listing = ", ".join(str(folder) for folder in intruders)
+        warnings.warn(
+            f"directory alongside the class folders also holds images: {listing}. "
+            f"Excluded from this index, which reads only {len(A3_CLASSES)} named class "
+            f"folders. A recursive loader pointed here would double every image and leak "
+            f"it across a train/validation split",
+            DuplicateCorpusWarning,
+            stacklevel=2,
+        )
+
+    rows = [
+        {"path": str(path.resolve()), "class_name": name, "label": label}
+        for label, name in enumerate(A3_CLASSES)
+        for path in _images_in(root / name)
+    ]
+
+    return pd.DataFrame(rows, columns=["path", "class_name", "label"])
+
+
+def _has_images_anywhere(folder: Path) -> bool:
+    """True if `folder` contains an image at any depth."""
+    return any(
+        path.suffix.lower() in _IMAGE_SUFFIXES for path in folder.rglob("*") if path.is_file()
+    )
