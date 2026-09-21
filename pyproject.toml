@@ -6,7 +6,11 @@ readme = "README.md"
 authors = [
     { name = "danimoreira90", email = "101526289+danimoreira90@users.noreply.github.com" }
 ]
-requires-python = ">=3.13"
+# Nothing here needs 3.13. Colab runs 3.13.15 today, but pinning the floor to the
+# machine that happened to run `uv init` means a Colab rollback to 3.12 would break the
+# install outright. The local environment is held at 3.13 by .python-version; this floor
+# only decides who is allowed to install the package.
+requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.10.0",
     "numpy>=2.1.3",
