@@ -1,0 +1,86 @@
+# Evidence for every rubric line. Fill each entry as its artefact is built.
+# artifact: repo-relative path.  anchor: a literal string that must appear in it.
+# Prefer substantive anchors (a table caption, a heading) over bare markers.
+
+# --- Section 1 ---
+# R1.1: Loaded a pretrained CNN, correctly replaced the classification head with the dataset's class count, and performed feature extraction with a frozen backbone.
+R1.1:
+
+# R1.2: Documented training curves and reported per-class and global accuracy.
+R1.2:
+
+# R1.3: Proposed at least three augmentation strategies, each justified for the dataset's domain.
+R1.3:
+
+# R1.4: Discussed in writing when to use feature extraction versus fine-tuning, based on dataset size and domain distance.
+R1.4:
+
+# R1.5: Justified the choice of pretrained model for the domain, considering Colab T4 capacity and the number of classes.
+R1.5:
+
+# --- Section 2 ---
+# R2.1: Implemented scaled dot-product attention and multi-head attention from scratch as testable PyTorch modules, with independent projections per attention head and concatenation of the head outputs.
+R2.1:
+
+# R2.2: Visualised attention weights as a heatmap for at least one example from the domain and interpreted in writing what the model attends to.
+R2.2:
+
+# R2.3: Built a complete TransformerEncoderBlock with a two-layer feedforward, LayerNorm and residual connections, used as the base of the ViT.
+R2.3:
+
+# R2.4: Applied positional encoding to the ViT token sequence and explained why attention without positional encoding does not preserve position.
+R2.4:
+
+# R2.5: Analysed in writing the differences between BERT pretraining and ViT pretraining, identifying what each strategy maximises.
+R2.5:
+
+# --- Section 3 ---
+# R3.1: Implemented patch embedding, a learnable CLS token and positional encoding, producing a complete ViT that takes an image and returns classification logits.
+R3.1:
+
+# R3.2: Trained the ViT from scratch on the chosen domain, generated attention maps from at least one head and identified emergent regions in writing.
+R3.2:
+
+# R3.3: Fine-tuned a pretrained ViT on the same domain, replaced the classification head and compared it with the from-scratch ViT in a quantitative table.
+R3.3:
+
+# R3.4: Analysed DeiT and Swin Transformer, explaining what each one solves that the original ViT does not.
+R3.4:
+
+# R3.5: Justified in writing when Vision Transformers beat CNNs and when CNNs are preferable, based on the chosen domain.
+R3.5:
+
+# R3.6: Built a comparison table of ViT from scratch versus pretrained ViT and justified the architecture choice for the domain from the data.
+R3.6:
+
+# --- Section 4 ---
+# R4.1: Analysed the alignment of visual and textual representations in CLIP, explaining why contrastive pretraining enables semantic retrieval with no supervised training.
+R4.1:
+
+# R4.2: Implemented ranking of objects by semantic frequency over the ADS-16 corpus with at least 20 descriptions, and visualised the 5 most frequent with example images.
+R4.2:
+
+# R4.3: Implemented semantic search by text with at least 8 queries varying in specificity, documenting and analysing the results.
+R4.3:
+
+# R4.4: Compared CLIP's textual query mechanism with BERT's sequence tokenisation, explaining the role of padding and the attention mask.
+R4.4:
+
+# --- Section 5 ---
+# R5.1: Diagnosed at least five technical problems in the X-ray project, each with its expected clinical impact.
+R5.1:
+
+# R5.2: Implemented a GAN, conditional or CycleGAN, generating medical-domain images with a correct adversarial training loop.
+R5.2:
+
+# R5.3: Diagnosed training instability, mode collapse or divergence, and applied at least one mitigation with evidence of improvement.
+R5.3:
+
+# R5.4: Evaluated the impact of synthetic augmentation on COVID-19 class recall by comparing training with and without the generated images.
+R5.4:
+
+# R5.5: Identified at least four problems in the traffic analysis project and explained the risks of ImageNet transfer learning for flow classification.
+R5.5:
+
+# R5.6: Delivered an integrated improvement plan for the X-ray project covering model, metric, synthetic augmentation and a clinical adoption criterion.
+R5.6:
