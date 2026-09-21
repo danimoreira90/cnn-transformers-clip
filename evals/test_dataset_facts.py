@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from cv_mba.data import elpv_index, stratified_split
+from cv_mba.data import DuplicateCorpusWarning, a3_index, elpv_index, stratified_split
 
 DATA_ROOT = Path(os.environ.get("CV_MBA_DATA", Path(__file__).resolve().parent.parent / "data" / "raw"))
 ELPV_ROOT = DATA_ROOT / "elpv"
@@ -72,3 +72,61 @@ def test_a_real_split_preserves_every_stratum_and_shares_no_image(elpv) -> None:
     for keys, group in elpv.groupby(["label", "wafer_type"]):
         chosen = test[(test["label"] == keys[0]) & (test["wafer_type"] == keys[1])]
         assert len(chosen) / len(group) == pytest.approx(0.2, abs=0.01)
+
+
+A3_ROOT = DATA_ROOT / "a3" / "data"
+
+A3_FETCH = "uv run kaggle datasets download -d pavansanagapati/images-dataset -p data/raw/a3 --unzip"
+
+A3_EXPECTED = {
+    "bike": 365,
+    "cars": 420,
+    "cats": 202,
+    "dogs": 202,
+    "flowers": 210,
+    "horses": 202,
+    "human": 202,
+}
+
+
+@pytest.fixture(scope="module")
+def a3():
+    if not (A3_ROOT / "cats").is_dir():
+        pytest.skip(f"A3 archive not at {A3_ROOT}. Fetch it with:  {A3_FETCH}")
+    with pytest.warns(DuplicateCorpusWarning):
+        return a3_index(A3_ROOT)
+
+
+def test_a3_holds_1803_unique_images_not_3606(a3) -> None:
+    assert len(a3) == 1803
+    assert len(a3) == sum(A3_EXPECTED.values())
+
+
+def test_a3_class_counts_are_unchanged(a3) -> None:
+    counts = a3["class_name"].value_counts().to_dict()
+
+    assert counts == A3_EXPECTED
+
+
+def test_a3_has_seven_classes_and_no_phantom_eighth(a3) -> None:
+    # A recursive load invents a class named "data" from the archive's copy of itself.
+    assert sorted(a3["class_name"].unique()) == sorted(A3_EXPECTED)
+    assert "data" not in set(a3["class_name"])
+
+
+def test_a3_contains_no_duplicate_paths(a3) -> None:
+    assert a3["path"].duplicated().sum() == 0
+
+
+def test_the_duplicate_is_still_there_and_still_excluded(a3) -> None:
+    # If Kaggle ever fixes the archive, the first assertion fails and the guard stops
+    # being needed. Until then: prove the copy exists, prove it is a full copy, and
+    # prove indexing the real root still returns 1,803 rather than 3,606.
+    nested = A3_ROOT / "data"
+
+    assert nested.is_dir(), "the nested copy is gone; revisit SPEC.md"
+    assert len(a3_index(nested)) == 1803, "the nested directory holds a full duplicate"
+    assert len(a3) == 1803, "indexing the real root must not pick the duplicate up"
+
+    every_image = sum(1 for _ in A3_ROOT.rglob("*") if _.suffix.lower() in {".jpg", ".png", ".bmp"})
+    assert every_image == 3606, "a recursive loader here would see twice the dataset"

@@ -12,7 +12,9 @@ import pytest
 
 from cv_mba.data import (
     DatasetNotFoundError,
+    DuplicateCorpusWarning,
     StratificationError,
+    a3_index,
     elpv_index,
     stratified_split,
 )
@@ -172,3 +174,129 @@ def test_split_rejects_a_test_size_outside_the_open_unit_interval(
 
     with pytest.raises(StratificationError, match="test_size"):
         stratified_split(frame, by=["label"], test_size=bad_size, seed=0)
+
+
+# --------------------------------------------------------------------------------------
+# A3 — the Kaggle images-dataset, which ships a copy of itself
+# --------------------------------------------------------------------------------------
+
+A3_CLASSES = ("bike", "cars", "cats", "dogs", "flowers", "horses", "human")
+
+
+def write_a3(root: Path, per_class: int = 3, with_duplicate: bool = False) -> Path:
+    """Build a miniature A3 archive, optionally including the nested copy of itself."""
+    data_dir = root / "data"
+    extension = {"bike": "bmp", "cars": "bmp", "flowers": "png"}
+    for name in A3_CLASSES:
+        folder = data_dir / name
+        folder.mkdir(parents=True, exist_ok=True)
+        for i in range(per_class):
+            (folder / f"{name}_{i:03d}.{extension.get(name, 'jpg')}").write_bytes(b"img")
+    if with_duplicate:
+        nested = data_dir / "data"
+        for name in A3_CLASSES:
+            folder = nested / name
+            folder.mkdir(parents=True, exist_ok=True)
+            for i in range(per_class):
+                (folder / f"{name}_{i:03d}.{extension.get(name, 'jpg')}").write_bytes(b"img")
+    return data_dir
+
+
+def test_a3_index_finds_every_class_once(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=3)
+
+    frame = a3_index(data_dir)
+
+    assert len(frame) == 21
+    assert sorted(frame["class_name"].unique()) == sorted(A3_CLASSES)
+
+
+def test_a3_labels_are_alphabetical_and_stable(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=1)
+
+    frame = a3_index(data_dir).sort_values("class_name")
+
+    assert list(zip(frame["class_name"], frame["label"])) == [
+        ("bike", 0), ("cars", 1), ("cats", 2), ("dogs", 3),
+        ("flowers", 4), ("horses", 5), ("human", 6),
+    ]
+
+
+def test_a3_index_reads_bmp_jpg_and_png(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=2)
+
+    frame = a3_index(data_dir)
+    suffixes = {Path(path).suffix for path in frame["path"]}
+
+    assert suffixes == {".bmp", ".jpg", ".png"}
+
+
+def test_a3_index_excludes_the_archives_copy_of_itself(tmp_path: Path) -> None:
+    # The real archive holds data/ and data/data/, an exact duplicate. This is the
+    # guarantee that matters: the count is identical whether the copy is there or not.
+    clean = write_a3(tmp_path / "clean", per_class=3)
+    trapped = write_a3(tmp_path / "trapped", per_class=3, with_duplicate=True)
+
+    with pytest.warns(DuplicateCorpusWarning, match="data"):
+        indexed = a3_index(trapped)
+
+    assert len(indexed) == len(a3_index(clean)) == 21
+    assert not any("trapped" in path and f"data{Path('/').as_posix()}data" in path.replace("\\", "/")
+                   for path in indexed["path"])
+
+
+def test_a3_index_names_the_duplicate_directory_in_the_warning(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=2, with_duplicate=True)
+
+    with pytest.warns(DuplicateCorpusWarning) as caught:
+        a3_index(data_dir)
+
+    assert str(data_dir / "data") in str(caught[0].message)
+
+
+def test_a3_index_points_one_level_down_when_given_the_wrong_root(tmp_path: Path) -> None:
+    write_a3(tmp_path, per_class=2)
+
+    with pytest.raises(DatasetNotFoundError, match="data"):
+        a3_index(tmp_path)
+
+
+def test_a3_index_names_the_classes_it_could_not_find(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=2)
+    for leftover in (data_dir / "flowers").iterdir():
+        leftover.unlink()
+    (data_dir / "flowers").rmdir()
+
+    with pytest.raises(DatasetNotFoundError, match="flowers"):
+        a3_index(data_dir)
+
+
+def test_a3_index_does_not_descend_inside_a_class_folder(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=2)
+    buried = data_dir / "cats" / "extra"
+    buried.mkdir()
+    (buried / "cats_999.jpg").write_bytes(b"img")
+
+    frame = a3_index(data_dir)
+
+    assert len(frame[frame["class_name"] == "cats"]) == 2
+
+
+def test_a3_index_ignores_files_that_are_not_images(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=2)
+    (data_dir / "cats" / "Thumbs.db").write_bytes(b"junk")
+    (data_dir / "cats" / "notes.txt").write_text("ignore me")
+
+    frame = a3_index(data_dir)
+
+    assert len(frame[frame["class_name"] == "cats"]) == 2
+
+
+def test_a3_index_returns_absolute_paths_that_exist(tmp_path: Path) -> None:
+    data_dir = write_a3(tmp_path, per_class=1)
+
+    frame = a3_index(data_dir)
+
+    for path in frame["path"]:
+        assert Path(path).is_absolute()
+        assert Path(path).is_file()
