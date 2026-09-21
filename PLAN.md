@@ -57,14 +57,14 @@ Implements: the coverage guarantee behind every rubric line.
   Create `.claude/settings.json` containing `{"includeCoAuthoredBy": false}` so no commit
   carries a generated-by trailer.
 - **TDD steps**: Configuration only, no production code, so no RED. Commit as `chore`.
-- **Verification**: `uv run pytest --collect-only` prints `no tests ran` without a
-  configuration error, and `git log -1 --format=%B` shows no trailer.
+- **Verification**: `uv run pytest --collect-only` runs without a configuration error,
+  and `git log -3 --format=%B | Select-String "Co-Authored|Generated with"` counts 0.
 - **Exit criteria**: pytest resolves `tests/`; jupytext pairing configured.
 - **Dependencies**: none
 - **Risk**: Low
 
 ### Task 0.2 — Rubric registry
-- **File**: `src/cv_mba/rubric.py`, `tests/test_rubric_coverage.py`, `evidence.yaml`
+- **File**: `src/cv_mba/rubric.py`, `tests/test_rubric.py`, `evals/test_rubric_coverage.py`, `evidence.yaml`
 - **Action**: Define `RUBRIC: dict[str, str]` holding all 26 ids R1.1–R1.5, R2.1–R2.5,
   R3.1–R3.6, R4.1–R4.4, R5.1–R5.6, each mapped to the rubric line in English. Define
   `load_evidence(path) -> dict[str, Evidence]` where `Evidence` carries `artifact` (a repo
@@ -78,9 +78,18 @@ Implements: the coverage guarantee behind every rubric line.
   2. GREEN: implement `rubric.py` so the failure is the honest 26-gap list rather than an
      import error.
   3. Commit: `test: add failing rubric coverage test` then `feat: implement rubric registry`
-- **Verification**: `uv run pytest tests/test_rubric_coverage.py -v` → fails with exactly
-  26 named ids.
+- **Verification**: `uv run pytest -q` → unit suite green. `uv run pytest evals/` → fails
+  with exactly 26 named ids.
 - **Exit criteria**: The failure list is the full rubric. This red stays red until Phase 7.
+- **Layout note (changed during implementation)**: the coverage check was originally
+  planned for `tests/`. It cannot live there. It is red by design until Task 7.4, and a
+  permanently failing member of the unit suite would break eval R1, whose gate is
+  `pass^3 = 1.00` on `uv run pytest`. The only ways to keep it in `tests/` are
+  `xfail` or `skip`, both of which `rules/anti-cheat-discipline.md` lists as faking a
+  passing state. So unit tests live in `tests/` and must always be green, eval graders
+  live in `evals/` and are red until earned, and `testpaths = ["tests"]` keeps bare
+  `pytest` on the unit suite. `.claude/evals/cv-mba.md` stays the eval contract;
+  `evals/` holds the code that grades it.
 - **Dependencies**: 0.1
 - **Risk**: Low
 
@@ -465,7 +474,7 @@ Implements: F5.2, F5.3, F5.4. Rubric R5.2, R5.3, R5.4. Highest risk, scheduled l
 ### Task 7.4 — Close the rubric red
 - **File**: `evidence.yaml`
 - **Action**: Fill all 26 entries with real artefact paths and anchors.
-- **Verification**: `uv run pytest tests/test_rubric_coverage.py -v` → passes for the
+- **Verification**: `uv run pytest evals/test_rubric_coverage.py -v` → passes for the
   first time since Task 0.2. Paste the output.
 - **Exit criteria**: The test that has been red since the first commit goes green on
   earned evidence.
@@ -501,3 +510,15 @@ Implements: F5.2, F5.3, F5.4. Rubric R5.2, R5.3, R5.4. Highest risk, scheduled l
 19 of 28 tasks need no GPU. Phases 0 through 2 are thirteen tasks that run entirely on
 your Windows machine with the CPU torch build, which is why the environment was pinned
 that way.
+
+
+---
+
+## Progress
+
+| Task | Status | Evidence |
+|---|---|---|
+| 0.1 Repo configuration | done | `uv run pytest -q` collects; trailer count 0 across the last 3 commits |
+| 0.2 Rubric registry | done | 11 unit tests pass in 0.21s; eval R3 red with 26 gaps; commits `24e9f5c`, `5e86897`, `790c927` |
+| 0.3 Eval file and baseline | done | `.claude/evals/cv-mba.md`, baseline recorded 2026-09-20 |
+| 1.1 Per-class metrics | next | |
