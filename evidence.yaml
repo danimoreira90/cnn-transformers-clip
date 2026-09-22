@@ -78,6 +78,8 @@ R5.1:
 
 # R5.2: Implemented a GAN, conditional or CycleGAN, generating medical-domain images with a correct adversarial training loop.
 R5.2:
+  artifact: notebooks/A4_estudo_caso_raio_x.py
+  anchor: def train_gan
 
 # R5.3: Diagnosed training instability, mode collapse or divergence, and applied at least one mitigation with evidence of improvement.
 R5.3:
