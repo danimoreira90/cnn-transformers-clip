@@ -525,4 +525,9 @@ that way.
 | 0.1 Repo configuration | done | `uv run pytest -q` collects; trailer count 0 across the last 3 commits |
 | 0.2 Rubric registry | done | 11 unit tests pass in 0.21s; eval R3 red with 26 gaps; commits `24e9f5c`, `5e86897`, `790c927` |
 | 0.3 Eval file and baseline | done | `.claude/evals/cv-mba.md`, baseline recorded 2026-09-20 |
-| 1.1 Per-class metrics | next | |
+| 1.1 Per-class metrics | done | 14 tests; agrees with sklearn on 4 label sets |
+| 1.2 ELPV loader and split | done | 2,624 cells, 1,803/821, joint stratification |
+| 1.3 A3 loader | done | 1,803 not 3,606; duplicate measured at 3,606 recursive |
+| 1.4 COVID and ADS-16 | done | 840/240/120 seeded; 301 ads vs 2,396 participant images |
+| 3.1 Colab install proof | done | torch 2.11.0+cu128 intact on Tesla T4 after install |
+| 2.1 Scaled dot-product attention | next | |

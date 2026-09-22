@@ -72,6 +72,24 @@ by 5 percentage points and an unstratified split lets that drift into the compar
 The assignment asks for the corpus "or a subset of at least 500 representative images".
 The advertising set is 301, not 500. This is handled in F2.1 below rather than papered over.
 
+**Two further findings, measured 2026-09-22, both worth a paragraph in the report.**
+
+*The brief says 16 product categories. The archive ships 20.* Advertisements sit in
+folders numbered 1 to 20 — 1 to 10 in part 1, 11 to 20 in part 2 — holding 16 images in
+folder 1 and 15 in each of the rest, totalling 301. Nothing in the archive names any
+folder; the only non-image files are `License.txt` and the source zips. So the folders
+are recorded as found and called `group`, never relabelled as product categories to make
+the data agree with the brief. Where the 16 in the brief and the source paper comes from
+cannot be determined from the archive, and saying so is the honest position.
+
+*Participant pictures sit one level deeper than advertisements.* Each participant folder
+holds `U####-IM-POS` and `U####-IM-NEG` subfolders plus five CSV files of survey
+responses. A loader written for the advertisement layout returns zero participant images
+and reports no error, which is how the control group in F2.1 would silently vanish. The
+loader reaches both levels and a test pins it. Contribution is also not the uniform ten
+per participant the source paper implies: 97 of the 120 contribute 20, the rest between
+10 and 30.
+
 ### A3 — Kaggle images-dataset (professor-specified)
 `kaggle datasets download -d pavansanagapati/images-dataset`
 
@@ -382,6 +400,10 @@ those two skills back out.
 
 ## Changelog
 
+- 2026-09-22 (2): ADS-16 structure measured against the loader. Counts in this spec were
+  all confirmed (301 / 2,396 / 2,697); two assumptions were not. The archive holds 20
+  numbered advertisement folders rather than the brief's 16 categories, and participant
+  pictures sit two levels down rather than one. Both recorded above.
 - 2026-09-22: Submission filenames resolved by inference from the rubric's BERT lines
   rather than by asking the professor. Only the AI usage citation remains open, and that
   is a task rather than a question.
