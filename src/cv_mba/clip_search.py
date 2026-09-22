@@ -92,11 +92,34 @@ def rank_concepts(
     )
 
 
+def features_of(output) -> Tensor:
+    """Pull the embedding tensor out of whatever the model handed back.
+
+    transformers 4.x returned a plain tensor from `get_image_features` and
+    `get_text_features`. transformers 5.x returns a `BaseModelOutputWithPooling`, whose
+    `pooler_output` holds the projected vector in the shared space. Colab currently ships
+    5.16, so a wrapper written against the older shape fails there with an attribute
+    error on a tensor method — which is exactly how this was found.
+
+    Accepting both keeps the notebooks working across that boundary instead of pinning
+    the project to whichever version happens to be installed today.
+    """
+    if isinstance(output, Tensor):
+        return output
+    pooled = getattr(output, "pooler_output", None)
+    if pooled is None:
+        raise TypeError(
+            f"cannot read embeddings from {type(output).__name__}; "
+            f"expected a Tensor or an output carrying pooler_output"
+        )
+    return pooled
+
+
 @torch.no_grad()
 def embed_texts(texts: Sequence[str], model, processor, device: str = "cpu") -> Tensor:
     """Encode text descriptions into the shared space, unit length."""
     inputs = processor(text=list(texts), return_tensors="pt", padding=True).to(device)
-    return l2_normalise(model.get_text_features(**inputs)).cpu()
+    return l2_normalise(features_of(model.get_text_features(**inputs))).cpu()
 
 
 @torch.no_grad()
@@ -117,7 +140,9 @@ def embed_images(paths: Sequence[str], model, processor, device: str = "cpu",
             with Image.open(path) as handle:
                 images.append(handle.convert("RGB"))
         inputs = processor(images=images, return_tensors="pt").to(device)
-        embeddings.append(l2_normalise(model.get_image_features(**inputs)).cpu())
+        embeddings.append(
+            l2_normalise(features_of(model.get_image_features(**inputs))).cpu()
+        )
         if on_batch is not None:
             on_batch(min(start + batch_size, len(paths)), len(paths))
 
