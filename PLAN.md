@@ -530,4 +530,16 @@ that way.
 | 1.3 A3 loader | done | 1,803 not 3,606; duplicate measured at 3,606 recursive |
 | 1.4 COVID and ADS-16 | done | 840/240/120 seeded; 301 ads vs 2,396 participant images |
 | 3.1 Colab install proof | done | torch 2.11.0+cu128 intact on Tesla T4 after install |
-| 2.1 Scaled dot-product attention | next | |
+| 2.1-2.2 Attention | done | 17 tests; matches torch.nn.MultiheadAttention on 9 checks |
+| 2.3 Encoder block | done | pre-norm pinned by arithmetic; residual proven by silencing both sublayers |
+| 2.4 Positional encoding | done | permutation pair executes the R2.4 claim both ways |
+| 2.5 Vision Transformer | done | 19 tests; CLS at index 0, attention retrievable per layer |
+| 2.6 Determinism harness | done | 5 tests; GPU check skips with a reason on CPU |
+| Shared modules | done | imagesets, training loop, clip retrieval, conditional GAN |
+| A3 notebook | written, unrun | executes end to end on CPU; 14,343 trainable params confirms the freeze |
+| A2 notebook | written, unrun | executes with real CLIP weights; 3 of 5 top concepts differ between partitions |
+| A1 notebook | written, unrun | executes end to end; eval C3 comparison logic verified |
+| A4.1 notebook | written, unrun | executes end to end; baseline, GAN, diversity, paired recall all run |
+| 7.1 Report analysis | done | 8,639 words; 12 rubric lines backed by the report alone |
+| 7.2 AI usage citation | done | declared in full, including the two rejected AI outputs |
+| Remaining | 4 Colab runs | see report/PENDING.md |
