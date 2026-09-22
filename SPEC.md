@@ -353,19 +353,38 @@ Two live Iron Laws close with pointers into quarantine:
 version and follows it. Fix by deleting the two Skill Reference sections or promoting
 those two skills back out.
 
+5. **Submission filenames: the discipline is `deep-learning-and-vision`.** Decided by
+   inference on 2026-09-22 rather than by asking.
+
+   The ZIP template `nomedoaluno_nomedadisciplina_pd.ZIP` has one slot, labelled name of
+   the discipline. The PDF name carries two strings, so one of them is the discipline and
+   one is not. The rubric decides which: lines 2.5 and 4.4 grade BERT pretraining
+   objectives and BERT tokenisation, and competency heading 2 reads "from the attention
+   mechanism to fine-tuning BERT". A discipline named Computer Vision does not examine a
+   language model. So `deep-learning-and-vision` is the discipline, and `computer-vision`
+   is the project descriptor, matching the project's own title, Visao Computacional com
+   Transformers.
+
+       daniel_moreira_deep-learning-and-vision_computer-vision.pdf
+       daniel_moreira_deep-learning-and-vision_pd.ZIP
+
+   Residual risk is low and hedged. The PDF name is fully specified by the brief; only
+   the archive name is inferred, and the grader opens the archive to find a correctly
+   named PDF inside. Task 7.5 also places a README.txt at the archive root naming the
+   student, discipline, project and contents, so the archive identifies itself if the
+   name is ever questioned.
+
 ## Still Open
 
-1. **Filename check with the professor.** The brief asks for
-   `nome_sobrenome_deep-learning-and-vision_computer-vision.pdf` and a ZIP named
-   `nomedoaluno_nomedadisciplina_pd.ZIP`. The ZIP pattern names only the discipline, so
-   the discipline string is ambiguous between `deep-learning-and-vision` and
-   `computer-vision`. One question resolves it.
-2. **AI usage citation.** The brief states that using AI without citing it is academic
+1. **AI usage citation.** The brief states that using AI without citing it is academic
    misconduct. The report needs an AI usage section. Separate from git trailers, which
    stay clean.
 
 ## Changelog
 
+- 2026-09-22: Submission filenames resolved by inference from the rubric's BERT lines
+  rather than by asking the professor. Only the AI usage citation remains open, and that
+  is a task rather than a question.
 - 2026-09-20 (2): Open questions 1-4 resolved. ELPV binary threshold corrected from p > 0
   to p >= 0.5 after the annotator-agreement cross-tab showed 26% label noise in the
   positive class at the original threshold. EDD deviation tightened: determinism proven by
