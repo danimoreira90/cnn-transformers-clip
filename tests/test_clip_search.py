@@ -14,6 +14,7 @@ import torch
 
 from cv_mba.clip_search import (
     cosine_similarity,
+    features_of,
     l2_normalise,
     rank_concepts,
     top_matches,
@@ -168,3 +169,29 @@ def test_ranking_accepts_numpy_as_well_as_torch() -> None:
     ranking = rank_concepts(similarity, CONCEPTS, threshold=0.5, standardise=False)
 
     assert len(ranking) == 3
+
+
+# --------------------------------------------------------------------------------------
+# Reading embeddings out of whichever shape the model returns
+# --------------------------------------------------------------------------------------
+
+def test_a_plain_tensor_is_passed_straight_through() -> None:
+    x = torch.randn(3, 512)
+
+    assert features_of(x) is x
+
+
+def test_a_pooled_output_object_gives_up_its_pooler_output() -> None:
+    # transformers 5.x wraps the embedding in an output object. A wrapper written for
+    # 4.x fails on Colab with an attribute error, which is how this was found.
+    class PooledOutput:
+        def __init__(self, pooled): self.pooler_output = pooled
+
+    pooled = torch.randn(3, 512)
+
+    assert torch.equal(features_of(PooledOutput(pooled)), pooled)
+
+
+def test_an_unreadable_output_says_what_it_expected() -> None:
+    with pytest.raises(TypeError, match="pooler_output"):
+        features_of(object())
