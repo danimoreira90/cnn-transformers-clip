@@ -16,7 +16,15 @@ from pathlib import Path
 
 import pytest
 
-from cv_mba.data import DuplicateCorpusWarning, a3_index, elpv_index, stratified_split
+from cv_mba.data import (
+    FAILED_PROJECT_COUNTS,
+    DuplicateCorpusWarning,
+    a3_index,
+    ads16_index,
+    covid_subsample,
+    elpv_index,
+    stratified_split,
+)
 
 DATA_ROOT = Path(os.environ.get("CV_MBA_DATA", Path(__file__).resolve().parent.parent / "data" / "raw"))
 ELPV_ROOT = DATA_ROOT / "elpv"
@@ -130,3 +138,91 @@ def test_the_duplicate_is_still_there_and_still_excluded(a3) -> None:
 
     every_image = sum(1 for _ in A3_ROOT.rglob("*") if _.suffix.lower() in {".jpg", ".png", ".bmp"})
     assert every_image == 3606, "a recursive loader here would see twice the dataset"
+
+
+COVID_ROOT = DATA_ROOT / "covid" / "COVID-19_Radiography_Dataset"
+ADS16_ROOT = DATA_ROOT / "ads16"
+
+COVID_FETCH = "uv run kaggle datasets download -d tawsifurrahman/covid19-radiography-database -p data/raw/covid --unzip"
+ADS16_FETCH = "uv run kaggle datasets download -d groffo/ads16-dataset -p data/raw/ads16 --unzip"
+
+
+@pytest.fixture(scope="module")
+def covid():
+    if not (COVID_ROOT / "COVID").is_dir():
+        pytest.skip(f"COVID archive not at {COVID_ROOT}. Fetch it with:  {COVID_FETCH}")
+    return covid_subsample(COVID_ROOT, seed=0)
+
+
+@pytest.fixture(scope="module")
+def ads16():
+    if not any(ADS16_ROOT.glob("ADS16_Benchmark_part*")):
+        pytest.skip(f"ADS-16 archive not at {ADS16_ROOT}. Fetch it with:  {ADS16_FETCH}")
+    return ads16_index(ADS16_ROOT)
+
+
+def test_covid_subsample_reproduces_the_failed_projects_split(covid) -> None:
+    assert covid["class_name"].value_counts().to_dict() == FAILED_PROJECT_COUNTS
+    assert len(covid) == 1200
+
+
+def test_covid_subsample_is_identical_across_runs(covid) -> None:
+    again = covid_subsample(COVID_ROOT, seed=0)
+
+    assert list(again["path"]) == list(covid["path"])
+
+
+def test_the_archive_still_has_enough_images_for_the_split(covid) -> None:
+    # 3,616 COVID images exist; the failed project used 120. If the archive ever shrinks
+    # below the requested counts, covid_subsample raises and this fails first.
+    generous = covid_subsample(COVID_ROOT, counts={"COVID": 1000}, seed=0)
+
+    assert len(generous) == 1000
+
+
+def test_ads16_holds_301_advertisements_among_2697_images(ads16) -> None:
+    counts = ads16["partition"].value_counts().to_dict()
+
+    assert counts == {"corpus": 2396, "ads": 301}
+    assert len(ads16) == 2697
+
+
+def test_ads16_advertisements_sit_in_twenty_numbered_folders(ads16) -> None:
+    # The brief says "16 categorias de produto". The archive ships 20 numbered folders
+    # and no file naming any of them. Measured, not assumed: 16 images in folder 1 and
+    # 15 in each of folders 2 to 20, totalling 301. The discrepancy is recorded in
+    # SPEC.md and belongs in the report's critical analysis; inventing category labels
+    # to make the data match the brief would be the wrong repair.
+    folders = ads16.query("partition == 'ads'")["group"]
+
+    assert len(folders.unique()) == 20
+    assert sorted(folders.value_counts().unique()) == [15, 16]
+
+
+def test_ads16_corpus_covers_all_120_survey_participants(ads16) -> None:
+    corpus = ads16.query("partition == 'corpus'")
+
+    assert len(corpus["group"].unique()) == 120
+
+
+def test_ads16_participant_pictures_split_into_positive_and_negative(ads16) -> None:
+    corpus = ads16.query("partition == 'corpus'")
+
+    assert sorted(corpus["subset"].unique()) == ["NEG", "POS"]
+
+
+def test_ads16_participants_contribute_between_10_and_30_pictures(ads16) -> None:
+    # Not the uniform 10 per participant the source paper implies. Most contribute 20.
+    per_participant = ads16.query("partition == 'corpus'").groupby("group").size()
+
+    assert per_participant.min() == 10
+    assert per_participant.max() == 30
+    assert per_participant.sum() == 2396
+
+
+def test_ads16_ad_count_falls_short_of_the_briefs_500_threshold(ads16) -> None:
+    # The brief offers "a subset of at least 500 representative images". The advertising
+    # corpus is 301. This is the measurement behind SPEC.md F2.1, which resolves the gap
+    # by reporting the ad and corpus partitions separately rather than padding the ads
+    # with participant pictures to clear a number.
+    assert len(ads16.query("partition == 'ads'")) < 500

@@ -15,6 +15,8 @@ from cv_mba.data import (
     DuplicateCorpusWarning,
     StratificationError,
     a3_index,
+    ads16_index,
+    covid_subsample,
     elpv_index,
     stratified_split,
 )
@@ -300,3 +302,185 @@ def test_a3_index_returns_absolute_paths_that_exist(tmp_path: Path) -> None:
     for path in frame["path"]:
         assert Path(path).is_absolute()
         assert Path(path).is_file()
+
+
+# --------------------------------------------------------------------------------------
+# A4.1 — the COVID chest X-ray subsample that reproduces the failed project
+# --------------------------------------------------------------------------------------
+
+def write_covid(root: Path, counts: dict[str, int]) -> Path:
+    """Build a miniature COVID-19 Radiography clone with its images/ subfolders."""
+    base = root / "COVID-19_Radiography_Dataset"
+    for name, how_many in counts.items():
+        folder = base / name / "images"
+        folder.mkdir(parents=True, exist_ok=True)
+        for i in range(how_many):
+            (folder / f"{name}-{i:05d}.png").write_bytes(b"img")
+    return base
+
+
+PLENTY = {"Normal": 200, "Viral Pneumonia": 120, "COVID": 90, "Lung_Opacity": 50}
+SMALL = {"Normal": 40, "Viral Pneumonia": 20, "COVID": 10}
+
+
+def test_covid_subsample_takes_exactly_the_counts_asked_for(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, PLENTY)
+
+    frame = covid_subsample(base, counts=SMALL, seed=0)
+
+    assert frame["class_name"].value_counts().to_dict() == SMALL
+
+
+def test_covid_labels_run_normal_pneumonia_covid(tmp_path: Path) -> None:
+    # Fixed so a confusion matrix row 2 is always COVID. The metrics tests and the
+    # report both read row 2 as the minority class; changing this silently would make
+    # every recall figure in activity 4.1 refer to the wrong disease.
+    base = write_covid(tmp_path, PLENTY)
+
+    frame = covid_subsample(base, counts=SMALL, seed=0)
+    mapping = dict(zip(frame["class_name"], frame["label"]))
+
+    assert mapping == {"Normal": 0, "Viral Pneumonia": 1, "COVID": 2}
+
+
+def test_covid_subsample_ignores_classes_it_was_not_asked_for(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, PLENTY)
+
+    frame = covid_subsample(base, counts=SMALL, seed=0)
+
+    assert "Lung_Opacity" not in set(frame["class_name"])
+
+
+def test_covid_subsample_is_reproducible_for_the_same_seed(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, PLENTY)
+
+    first = covid_subsample(base, counts=SMALL, seed=3)
+    second = covid_subsample(base, counts=SMALL, seed=3)
+
+    assert list(first["path"]) == list(second["path"])
+
+
+def test_covid_subsample_changes_with_the_seed(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, PLENTY)
+
+    first = covid_subsample(base, counts=SMALL, seed=3)
+    second = covid_subsample(base, counts=SMALL, seed=4)
+
+    assert list(first["path"]) != list(second["path"])
+
+
+def test_covid_subsample_holds_no_duplicate_images(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, PLENTY)
+
+    frame = covid_subsample(base, counts=SMALL, seed=0)
+
+    assert frame["path"].duplicated().sum() == 0
+
+
+def test_covid_subsample_refuses_to_pad_a_class_that_is_too_small(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, {"Normal": 40, "Viral Pneumonia": 20, "COVID": 5})
+
+    with pytest.raises(DatasetNotFoundError, match="COVID"):
+        covid_subsample(base, counts=SMALL, seed=0)
+
+
+def test_covid_subsample_names_a_class_folder_that_is_absent(tmp_path: Path) -> None:
+    base = write_covid(tmp_path, {"Normal": 40, "Viral Pneumonia": 20})
+
+    with pytest.raises(DatasetNotFoundError, match="COVID"):
+        covid_subsample(base, counts=SMALL, seed=0)
+
+
+# --------------------------------------------------------------------------------------
+# A2 — ADS-16, where most of the images are not advertisements
+# --------------------------------------------------------------------------------------
+
+def write_ads16(root: Path, ads_per_folder: int = 2, pictures_per_bucket: int = 3) -> Path:
+    """Build a miniature ADS-16 clone matching the real layout.
+
+    Advertisements sit one level down; participant pictures sit two, split across the
+    POS and NEG buckets. That extra level is what the first version of the loader missed.
+    """
+    for part, folders, participants in (("part1", ["1", "2"], ["U0001", "U0002"]),
+                                        ("part2", ["3", "4"], ["U0003"])):
+        stem = root / f"ADS16_Benchmark_{part}" / f"ADS16_Benchmark_{part}"
+        for folder in folders:
+            where = stem / "Ads" / "Ads" / folder
+            where.mkdir(parents=True, exist_ok=True)
+            for i in range(ads_per_folder):
+                (where / f"{i}.png").write_bytes(b"img")
+        for participant in participants:
+            for bucket in ("POS", "NEG"):
+                where = stem / "Corpus" / "Corpus" / participant / f"{participant}-IM-{bucket}"
+                where.mkdir(parents=True, exist_ok=True)
+                for i in range(pictures_per_bucket):
+                    (where / f"{i}.png").write_bytes(b"img")
+    return root
+
+
+def test_ads16_separates_advertisements_from_participant_pictures(tmp_path: Path) -> None:
+    write_ads16(tmp_path, ads_per_folder=2, pictures_per_bucket=3)
+
+    frame = ads16_index(tmp_path)
+
+    assert frame["partition"].value_counts().to_dict() == {"corpus": 18, "ads": 8}
+
+
+def test_ads16_reaches_pictures_two_levels_below_the_participant(tmp_path: Path) -> None:
+    # The regression that matters. Advertisements are one level down, participant
+    # pictures are two. A loader written for the advertisement layout returns zero
+    # corpus rows and says nothing, so the control group silently disappears.
+    write_ads16(tmp_path, pictures_per_bucket=3)
+
+    corpus = ads16_index(tmp_path).query("partition == 'corpus'")
+
+    assert len(corpus) == 18
+
+
+def test_ads16_records_the_positive_and_negative_buckets(tmp_path: Path) -> None:
+    write_ads16(tmp_path, pictures_per_bucket=3)
+
+    corpus = ads16_index(tmp_path).query("partition == 'corpus'")
+
+    assert sorted(corpus["subset"].unique()) == ["NEG", "POS"]
+    assert corpus["subset"].value_counts().to_dict() == {"POS": 9, "NEG": 9}
+
+
+def test_ads16_tags_each_advertisement_with_the_folder_it_came_from(tmp_path: Path) -> None:
+    write_ads16(tmp_path, ads_per_folder=2)
+
+    ads = ads16_index(tmp_path).query("partition == 'ads'")
+
+    assert sorted(ads["group"].unique()) == ["1", "2", "3", "4"]
+    assert set(ads["subset"]) == {""}
+
+
+def test_ads16_tags_each_picture_with_its_participant(tmp_path: Path) -> None:
+    write_ads16(tmp_path)
+
+    corpus = ads16_index(tmp_path).query("partition == 'corpus'")
+
+    assert sorted(corpus["group"].unique()) == ["U0001", "U0002", "U0003"]
+
+
+def test_ads16_reads_both_benchmark_parts(tmp_path: Path) -> None:
+    write_ads16(tmp_path, ads_per_folder=2)
+
+    frame = ads16_index(tmp_path)
+    parts = {"part1" if "part1" in path else "part2" for path in frame["path"]}
+
+    assert parts == {"part1", "part2"}
+
+
+def test_ads16_raises_when_no_benchmark_part_is_present(tmp_path: Path) -> None:
+    with pytest.raises(DatasetNotFoundError, match="ADS16_Benchmark"):
+        ads16_index(tmp_path)
+
+
+def test_ads16_returns_absolute_paths_with_no_duplicates(tmp_path: Path) -> None:
+    write_ads16(tmp_path)
+
+    frame = ads16_index(tmp_path)
+
+    assert frame["path"].duplicated().sum() == 0
+    assert all(Path(path).is_absolute() for path in frame["path"])
