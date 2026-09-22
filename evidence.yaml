@@ -21,6 +21,8 @@ R1.5:
 # --- Section 2 ---
 # R2.1: Implemented scaled dot-product attention and multi-head attention from scratch as testable PyTorch modules, with independent projections per attention head and concatenation of the head outputs.
 R2.1:
+  artifact: src/cv_mba/attention.py
+  anchor: class MultiHeadAttention
 
 # R2.2: Visualised attention weights as a heatmap for at least one example from the domain and interpreted in writing what the model attends to.
 R2.2:
