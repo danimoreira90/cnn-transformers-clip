@@ -103,8 +103,24 @@ STARTED_AT = time.time()
 if "google.colab" in sys.modules:
     from google.colab import userdata
 
-    os.environ["KAGGLE_USERNAME"] = userdata.get("KAGGLE_USERNAME")
-    os.environ["KAGGLE_KEY"] = userdata.get("KAGGLE_KEY")
+    try:
+        os.environ["KAGGLE_USERNAME"] = userdata.get("KAGGLE_USERNAME")
+        os.environ["KAGGLE_KEY"] = userdata.get("KAGGLE_KEY")
+    except Exception as error:
+        raise RuntimeError(
+            "This notebook cannot read your Kaggle credentials.\n"
+            "\n"
+            "  1. Click the key icon in the left sidebar (Secrets).\n"
+            "  2. Add two secrets, named exactly KAGGLE_USERNAME and KAGGLE_KEY.\n"
+            "     Both values are in your kaggle.json, or from kaggle.com ->\n"
+            "     Settings -> API -> Create New Token.\n"
+            "  3. Turn the Notebook access toggle ON for BOTH secrets. A secret that\n"
+            "     exists but is not shared with this notebook fails the same way.\n"
+            "  4. Re-run this cell.\n"
+            "\n"
+            f"Colab reported: {type(error).__name__}: {error}"
+        ) from error
+
     print("using Kaggle credentials from Colab Secrets")
 else:
     print("not on Colab; using the local ~/.kaggle/kaggle.json")
