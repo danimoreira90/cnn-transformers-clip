@@ -229,3 +229,138 @@ def _has_images_anywhere(folder: Path) -> bool:
     return any(
         path.suffix.lower() in _IMAGE_SUFFIXES for path in folder.rglob("*") if path.is_file()
     )
+
+
+COVID_CLASSES = ("Normal", "Viral Pneumonia", "COVID")
+"""The three X-ray classes, in label order.
+
+Fixed deliberately: row 2 of any confusion matrix is COVID, the minority class whose
+recall the whole of activity 4.1 turns on. Reordering these would silently re-point every
+recall figure in the report at a different disease.
+"""
+
+FAILED_PROJECT_COUNTS = {"Normal": 840, "Viral Pneumonia": 240, "COVID": 120}
+"""The split the previous group used: 1,200 images, 7 to 2 to 1.
+
+Reproduced exactly rather than described, so every later number is a comparison against a
+measured baseline instead of an assertion about one.
+"""
+
+
+def covid_subsample(
+    root: Path | str,
+    counts: dict[str, int] | None = None,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Draw a seeded subsample from the COVID-19 Radiography Database.
+
+    Returns `path`, `class_name` and `label`, with labels following COVID_CLASSES.
+
+    Filenames are sorted before sampling so the draw depends only on the seed, never on
+    the order the filesystem happens to return. Without that, the "same" baseline differs
+    between machines and the with-and-without comparison in F5.4 compares two different
+    experiments.
+
+    A class with fewer images than requested raises rather than returning a short class.
+    Quietly delivering 90 images where 120 were asked for would change the imbalance
+    being studied, which is the one thing activity 4.1 is about.
+    """
+    root = Path(root)
+    wanted = dict(counts if counts is not None else FAILED_PROJECT_COUNTS)
+    rng = np.random.default_rng(seed)
+    rows: list[dict[str, object]] = []
+
+    for label, name in enumerate(COVID_CLASSES):
+        if name not in wanted:
+            continue
+
+        folder = root / name / "images"
+        if not folder.is_dir():
+            folder = root / name
+        if not folder.is_dir():
+            raise DatasetNotFoundError(f"no folder for class {name!r} under {root}")
+
+        available = _images_in(folder)
+        if len(available) < wanted[name]:
+            raise DatasetNotFoundError(
+                f"class {name!r} has {len(available)} image(s) but {wanted[name]} were "
+                f"requested; sampling cannot invent the difference"
+            )
+
+        chosen = rng.choice(len(available), size=wanted[name], replace=False)
+        rows.extend(
+            {"path": str(available[index].resolve()), "class_name": name, "label": label}
+            for index in sorted(chosen)
+        )
+
+    return pd.DataFrame(rows, columns=["path", "class_name", "label"])
+
+
+def ads16_index(root: Path | str) -> pd.DataFrame:
+    """Index ADS-16, separating advertisements from participant photographs.
+
+    Returns `path`, `partition` (`ads` or `corpus`), `group` and `subset`:
+
+    - ads      — `group` is the numbered folder the advertisement sits in, `subset` empty
+    - corpus   — `group` is the participant (U0001 ... U0120), `subset` is POS or NEG,
+                 the two folders each participant's pictures are split across
+
+    The separation is the point. Only 301 of the 2,697 images are advertisements; the
+    other 2,396 belong to the 120 survey participants. Treating the whole archive as an
+    advertising corpus would rank personal photographs as advertising content. Keeping
+    the partitions apart turns that hazard into the control group in SPEC.md F2.1.
+
+    Measured on the real archive, 2026-09-22: 301 advertisements across 20 numbered
+    folders, and 2,396 participant images across 120 participants, between 10 and 30
+    each. The archive ships no file naming the folders, so `group` is the folder as
+    found, never an invented category label.
+    """
+    root = Path(root)
+
+    parts = sorted(root.glob("ADS16_Benchmark_part*/ADS16_Benchmark_part*"))
+    if not parts:
+        raise DatasetNotFoundError(f"no ADS16_Benchmark_part* directories under {root}")
+
+    rows: list[dict[str, object]] = []
+    for part in parts:
+        rows.extend(_ads16_advertisements(part / "Ads" / "Ads"))
+        rows.extend(_ads16_participant_images(part / "Corpus" / "Corpus"))
+
+    return pd.DataFrame(rows, columns=["path", "partition", "group", "subset"])
+
+
+def _ads16_advertisements(container: Path) -> list[dict[str, object]]:
+    """Advertisements, one level down: <container>/<folder>/<image>."""
+    if not container.is_dir():
+        return []
+
+    return [
+        {"path": str(image.resolve()), "partition": "ads", "group": folder.name, "subset": ""}
+        for folder in sorted(container.iterdir())
+        if folder.is_dir()
+        for image in _images_in(folder)
+    ]
+
+
+def _ads16_participant_images(container: Path) -> list[dict[str, object]]:
+    """Participant pictures, two levels down: <container>/U0001/U0001-IM-POS/<image>.
+
+    The extra level is why a loader written against the advertisement layout returns
+    nothing here rather than failing loudly.
+    """
+    if not container.is_dir():
+        return []
+
+    return [
+        {
+            "path": str(image.resolve()),
+            "partition": "corpus",
+            "group": participant.name,
+            "subset": bucket.name.rsplit("-", 1)[-1],
+        }
+        for participant in sorted(container.iterdir())
+        if participant.is_dir()
+        for bucket in sorted(participant.iterdir())
+        if bucket.is_dir()
+        for image in _images_in(bucket)
+    ]
