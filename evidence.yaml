@@ -41,6 +41,8 @@ R2.5:
 # --- Section 3 ---
 # R3.1: Implemented patch embedding, a learnable CLS token and positional encoding, producing a complete ViT that takes an image and returns classification logits.
 R3.1:
+  artifact: src/cv_mba/vit.py
+  anchor: class VisionTransformer
 
 # R3.2: Trained the ViT from scratch on the chosen domain, generated attention maps from at least one head and identified emergent regions in writing.
 R3.2:
