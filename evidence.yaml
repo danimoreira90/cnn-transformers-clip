@@ -29,6 +29,8 @@ R2.2:
 
 # R2.3: Built a complete TransformerEncoderBlock with a two-layer feedforward, LayerNorm and residual connections, used as the base of the ViT.
 R2.3:
+  artifact: src/cv_mba/encoder.py
+  anchor: class TransformerEncoderBlock
 
 # R2.4: Applied positional encoding to the ViT token sequence and explained why attention without positional encoding does not preserve position.
 R2.4:
